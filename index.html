@@ -1,0 +1,2111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>أداة بناء البرنامج الزمني وإدارة المشروعات الهندسية | CPM & Cash Flow</title>
+    
+    <!-- Google Fonts: Cairo & Tajawal -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Cairo', 'Tajawal', 'sans-serif'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <!-- SheetJS (XLSX) for Excel/CSV Import & Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Chart.js for S-Curve & Cash Flow Charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f1f5f9;
+            color: #1e293b;
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Gantt Chart Grid Lines */
+        .gantt-grid-bg {
+            background-image: linear-gradient(to left, #e2e8f0 1px, transparent 1px);
+        }
+
+        /* Print Styling */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white !important;
+            }
+            .shadow-sm, .shadow-md, .shadow-lg {
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+        }
+
+        /* Range Slider Styling */
+        input[type=range] {
+            accent-color: #2563eb;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Toast Notification Banner (Replaces alert) -->
+    <div id="toast-container" class="fixed bottom-5 left-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Top Navigation & Header -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40 no-print">
+        <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+                    <i class="fa-solid fa-diagram-project text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold tracking-tight text-white">نظام التخطيط الزمني وإدارة المشروعات الهندسية</h1>
+                    <p class="text-xs text-slate-300">التسلسل الفني الإلزامي (9 مراحل) • المسار الحرج (CPM) • التدفقات النقدية و S-Curve</p>
+                </div>
+            </div>
+
+            <!-- Action Toolbar -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="openModal('import-modal')" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>استيراد / لصق المقايسة (BOQ)</span>
+                </button>
+                <button onclick="openModal('add-item-modal')" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>إضافة بند</span>
+                </button>
+                <button onclick="exportToExcel()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 border border-slate-600">
+                    <i class="fa-solid fa-file-excel text-emerald-400"></i>
+                    <span>تصدير Excel</span>
+                </button>
+                <button onclick="saveProjectToStorage()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 border border-slate-600" title="حفظ في المتصفح">
+                    <i class="fa-solid fa-floppy-disk text-blue-400"></i>
+                    <span class="hidden sm:inline">حفظ</span>
+                </button>
+                <button onclick="resetToDefaultProject()" class="px-3 py-2 bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 border border-slate-700" title="استعادة المشروع الافتراضي">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="window.print()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs md:text-sm font-semibold rounded-lg transition flex items-center gap-2 border border-slate-600" title="طباعة التقرير">
+                    <i class="fa-solid fa-print"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 py-5 space-y-5">
+
+        <!-- Project Parameters Control Bar -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
+                <div class="lg:col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">اسم المشروع (Project Name)</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-building absolute right-3 top-3 text-slate-400 text-sm"></i>
+                        <input type="text" id="project-name" value="مشروع تأهيل وتشطيب مبنى إداري وسكني متكامل" onchange="updateSettings()"
+                            class="w-full pr-9 pl-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white transition">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">تاريخ بداية المشروع (Start Date)</label>
+                    <input type="date" id="project-start" onchange="updateSettings()"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">تاريخ المتابعة / الحالة (Data Date)</label>
+                    <input type="date" id="project-data-date" onchange="updateSettings()"
+                        class="w-full px-3 py-2 bg-amber-50/60 border border-amber-300 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">أيام العمل الأسبوعية / العملة</label>
+                    <div class="flex gap-2">
+                        <select id="work-days-week" onchange="updateSettings()" class="w-2/3 px-2.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500">
+                            <option value="6" selected>6 أيام (عطلة الجمعة)</option>
+                            <option value="5">5 أيام (عطلة الجمعة والسبت)</option>
+                            <option value="7">7 أيام (عمل مستمر)</option>
+                        </select>
+                        <input type="text" id="currency-symbol" value="ر.س" onchange="updateSettings()" placeholder="العملة"
+                            class="w-1/3 px-2 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-center text-slate-800 focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Executive KPI Dashboard Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- KPI 1: Contract Value -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500">إجمالي قيمة التعاقد (BAC)</p>
+                        <h3 id="kpi-total-cost" class="text-xl md:text-2xl font-extrabold text-slate-800 mt-1">0</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <i class="fa-solid fa-sack-dollar text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>عدد البنود: <strong id="kpi-items-count" class="text-slate-700">0</strong></span>
+                    <span class="text-blue-600 font-semibold">9 مراحل فنية</span>
+                </div>
+            </div>
+
+            <!-- KPI 2: Project Duration & Finish Date -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500">مدة التنفيذ الكلية وتاريخ الانتهاء</p>
+                        <h3 id="kpi-duration" class="text-xl md:text-2xl font-extrabold text-indigo-700 mt-1">0 يوم عمل</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                        <i class="fa-solid fa-calendar-check text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                    <span>النهاية المتوقعة:</span>
+                    <strong id="kpi-end-date" class="text-slate-800 dir-ltr">-</strong>
+                </div>
+            </div>
+
+            <!-- KPI 3: Planned Progress % -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500">نسبة الإنجاز المقررة (Planned %)</p>
+                        <h3 id="kpi-planned-pct" class="text-xl md:text-2xl font-extrabold text-sky-600 mt-1">0.0%</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+                        <i class="fa-solid fa-chart-line text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div id="bar-planned-pct" class="bg-sky-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">حتى تاريخ المتابعة المحدد</p>
+                </div>
+            </div>
+
+            <!-- KPI 4: Actual Progress % & Schedule Variance -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500">نسبة الإنجاز الفعلي (Actual %)</p>
+                        <h3 id="kpi-actual-pct" class="text-xl md:text-2xl font-extrabold text-emerald-600 mt-1">0.0%</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <i class="fa-solid fa-bars-progress text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div id="bar-actual-pct" class="bg-emerald-500 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    </div>
+                    <div class="flex justify-between items-center mt-1 text-[11px]">
+                        <span class="text-slate-400">الانحراف الزمني (SV%):</span>
+                        <span id="kpi-sv-badge" class="font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">0.0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KPI 5: Financial Progress & Earned Value -->
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-slate-500">الإنجاز المالي والقيمة المكتسبة (EV)</p>
+                        <h3 id="kpi-financial-pct" class="text-xl md:text-2xl font-extrabold text-amber-600 mt-1">0.0%</h3>
+                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <i class="fa-solid fa-coins text-lg"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span class="text-slate-500">القيمة المستحقة (EV):</span>
+                    <strong id="kpi-earned-value" class="text-amber-700">0</strong>
+                </div>
+            </div>
+        </section>
+
+        <!-- Technical Sequence Reference Strip -->
+        <section class="bg-slate-800 text-slate-200 rounded-2xl p-3 shadow-sm border border-slate-700">
+            <div class="flex items-center justify-between mb-2 px-1">
+                <span class="text-xs font-bold text-blue-300 flex items-center gap-1.5">
+                    <i class="fa-solid fa-lock"></i>
+                    التسلسل الفني الإلزامي للتنفيذ والتبعيات (Mandatory 9-Phase Technical Sequence):
+                </span>
+                <span class="text-[11px] text-slate-400 hidden md:inline">يتم ربط وتوليد التبعيات (FS) تلقائياً دون إخلال بالترتيب الهندسي</span>
+            </div>
+            <div id="phases-stepper" class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-1.5 text-[11px]">
+                <!-- Populated by JS -->
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="flex flex-wrap border-b border-slate-200 bg-slate-50/70 px-2 pt-2 gap-1 no-print">
+                <button onclick="switchTab('boq')" id="tab-btn-boq" class="tab-btn px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 border-blue-600 bg-white text-blue-700 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-table-list"></i>
+                    <span>1. جدول الكميات والمدد والتصنيف (BOQ & WBS)</span>
+                </button>
+                <button onclick="switchTab('gantt')" id="tab-btn-gantt" class="tab-btn px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-chart-gantt"></i>
+                    <span>2. المخطط الزمني التفاعلي والمسار الحرج (Gantt & CPM)</span>
+                </button>
+                <button onclick="switchTab('cashflow')" id="tab-btn-cashflow" class="tab-btn px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-chart-area"></i>
+                    <span>3. التدفقات المالية ومنحنى الإنجاز (Cash Flow & S-Curve)</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: BOQ & WBS Table -->
+            <div id="tab-content-boq" class="p-4 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute right-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="boq-search" onkeyup="renderBOQTable()" placeholder="بحث في بنود الأعمال..."
+                                class="pr-8 pl-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-blue-500 w-56">
+                        </div>
+                        <select id="boq-phase-filter" onchange="renderBOQTable()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-500">
+                            <option value="all">جميع المراحل الفنية (1 - 9)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs text-slate-600">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> مسار حرج (Critical)</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> غير حرج (Float > 0)</span>
+                        <button onclick="simulateProgressToDataDate()" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg border border-indigo-200 transition">
+                            <i class="fa-solid fa-wand-magic-sparkles ml-1"></i>
+                            محاكاة الإنجاز الفعلي مطابق للمخطط
+                        </button>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-right border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-800 text-white font-bold">
+                                <th class="p-2.5 border-l border-slate-700 w-16 text-center">WBS</th>
+                                <th class="p-2.5 border-l border-slate-700 min-w-[220px]">وصف البند / النشاط</th>
+                                <th class="p-2.5 border-l border-slate-700 w-44">التصنيف الفني (المرحلة)</th>
+                                <th class="p-2.5 border-l border-slate-700 w-20 text-center">الكمية</th>
+                                <th class="p-2.5 border-l border-slate-700 w-16 text-center">الوحدة</th>
+                                <th class="p-2.5 border-l border-slate-700 w-24 text-center">سعر الوحدة</th>
+                                <th class="p-2.5 border-l border-slate-700 w-28 text-center">الإجمالي</th>
+                                <th class="p-2.5 border-l border-slate-700 w-20 text-center" title="معدل الإنتاجية اليومي للفرقة الواحدة">الإنتاجية/يوم</th>
+                                <th class="p-2.5 border-l border-slate-700 w-16 text-center">الفرق</th>
+                                <th class="p-2.5 border-l border-slate-700 w-20 text-center bg-slate-700">المدة (يوم)</th>
+                                <th class="p-2.5 border-l border-slate-700 w-24 text-center">البداية</th>
+                                <th class="p-2.5 border-l border-slate-700 w-24 text-center">النهاية</th>
+                                <th class="p-2.5 border-l border-slate-700 w-24 text-center">المسار / السماحية</th>
+                                <th class="p-2.5 border-l border-slate-700 w-20 text-center">المخطط %</th>
+                                <th class="p-2.5 border-l border-slate-700 w-36 text-center bg-emerald-900/40">الإنجاز الفعلي %</th>
+                                <th class="p-2.5 w-12 text-center no-print">حذف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="boq-table-body" class="divide-y divide-slate-200 bg-white">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 2: Gantt Chart & CPM -->
+            <div id="tab-content-gantt" class="p-4 hidden space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-bold text-slate-700">مقياس العرض الزمني:</span>
+                        <div class="inline-flex rounded-lg bg-slate-200 p-0.5">
+                            <button onclick="setGanttZoom('day')" id="zoom-day" class="px-3 py-1 rounded-md text-xs font-bold bg-white text-blue-700 shadow-sm transition">يومي (Days)</button>
+                            <button onclick="setGanttZoom('week')" id="zoom-week" class="px-3 py-1 rounded-md text-xs font-bold text-slate-600 hover:text-slate-900 transition">أسبوعي (Weeks)</button>
+                        </div>
+                        <button onclick="toggleAllGanttPhases()" class="px-3 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100">
+                            <i class="fa-solid fa-layer-group ml-1"></i> طي / فرد المراحل
+                        </button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-4 text-xs">
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-rose-500 inline-block"></span> مسار حرج (Critical Path)</span>
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-blue-500 inline-block"></span> نشاط غير حرج (Non-Critical)</span>
+                        <span class="flex items-center gap-1.5"><span class="w-4 h-3 rounded bg-slate-900/70 inline-block"></span> الإنجاز الفعلي (Actual)</span>
+                        <span class="flex items-center gap-1.5"><span class="w-0.5 h-4 bg-amber-500 inline-block"></span> خط تاريخ المتابعة (Data Date)</span>
+                    </div>
+                </div>
+
+                <!-- Gantt Chart Container -->
+                <div class="border border-slate-300 rounded-xl overflow-hidden bg-white shadow-inner">
+                    <div id="gantt-wrapper" class="overflow-x-auto relative max-h-[650px] overflow-y-auto">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Cash Flow & S-Curve -->
+            <div id="tab-content-cashflow" class="p-4 hidden space-y-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800">التحليل المالي والتدفقات النقدية ومنحنى الإنجاز (S-Curve)</h3>
+                        <p class="text-xs text-slate-500">توزيع التكاليف المخططة (PV) والقيمة المكتسبة (EV) ونسب الإنجاز التراكمية عبر فترات المشروع</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-slate-600">الفترة الزمنية للتجميع:</span>
+                        <select id="cashflow-period" onchange="renderCashFlowAndCharts()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700">
+                            <option value="week" selected>أسبوعي (Weekly Periods)</option>
+                            <option value="month">شهري (Monthly Periods)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Chart 1: S-Curve -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-bezier-curve text-blue-600"></i>
+                                منحنى الإنجاز التراكمي (S-Curve: المقرر vs الفعلي vs المالي)
+                            </h4>
+                        </div>
+                        <div class="h-80 w-full">
+                            <canvas id="scurve-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Chart 2: Cash Flow -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-money-bill-trend-up text-emerald-600"></i>
+                                التدفقات النقدية الدورية والتراكمية (Cash Flow)
+                            </h4>
+                        </div>
+                        <div class="h-80 w-full">
+                            <canvas id="cashflow-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase Financial Breakdown Summary -->
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-800 text-white px-4 py-2.5 text-xs font-bold flex justify-between items-center">
+                        <span>ملخص التكاليف ونسب الإنجاز حسب المراحل الفنية التسع</span>
+                        <span>إجمالي الوزن النسبي: 100%</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-2.5">المرحلة الفنية</th>
+                                    <th class="p-2.5 text-center">عدد البنود</th>
+                                    <th class="p-2.5 text-center">التكلفة المخططة (BAC)</th>
+                                    <th class="p-2.5 text-center">الوزن النسبي %</th>
+                                    <th class="p-2.5 text-center">نسبة الإنجاز المقررة %</th>
+                                    <th class="p-2.5 text-center">نسبة الإنجاز الفعلية %</th>
+                                    <th class="p-2.5 text-center">القيمة المكتسبة (EV)</th>
+                                    <th class="p-2.5 text-center">نسبة الإنجاز المالي %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="phase-summary-body" class="divide-y divide-slate-200">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Period-by-Period Cash Flow Table -->
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-800 text-white px-4 py-2.5 text-xs font-bold">
+                        جدول التدفقات المالية التفصيلي ونسب الإنجاز الدورية والتراكمية
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-2.5">الفترة الزمنية</th>
+                                    <th class="p-2.5 text-center">نطاق التاريخ</th>
+                                    <th class="p-2.5 text-center">التدفق النقدي الدوري (PV)</th>
+                                    <th class="p-2.5 text-center">التدفق النقدي التراكمي</th>
+                                    <th class="p-2.5 text-center">نسبة الإنجاز المقررة التراكمية %</th>
+                                    <th class="p-2.5 text-center">القيمة المكتسبة التراكمية (EV)</th>
+                                    <th class="p-2.5 text-center">نسبة الإنجاز الفعلي / المالي %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cashflow-table-body" class="divide-y divide-slate-200">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL 1: Add Single BOQ Item -->
+    <div id="add-item-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
+            <div class="bg-slate-800 text-white px-5 py-3.5 flex justify-between items-center">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-blue-400"></i>
+                    إضافة بند جديد إلى جدول الكميات
+                </h3>
+                <button onclick="closeModal('add-item-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form onsubmit="handleAddSingleItem(event)" class="p-5 space-y-4 text-xs">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">وصف البند / النشاط الهندسي *</label>
+                    <input type="text" id="new-item-name" required oninput="autoDetectPhasePreview(this.value)"
+                        placeholder="مثال: توريد وتركيب سيراميك أرضيات بورسلين 60×60..."
+                        class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    <p id="detected-phase-hint" class="text-[11px] text-blue-600 font-semibold mt-1">
+                        <i class="fa-solid fa-robot ml-1"></i> التصنيف التلقائي المقترح: سيتم تحديده أثناء الكتابة
+                    </p>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">المرحلة الفنية (التسلسل الإلزامي 1 - 9) *</label>
+                    <select id="new-item-phase" class="w-full px-3 py-2 border border-slate-300 rounded-xl font-semibold text-slate-800 focus:outline-none focus:border-blue-500">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">الكمية *</label>
+                        <input type="number" id="new-item-qty" step="0.01" min="0.1" value="100" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">الوحدة *</label>
+                        <input type="text" id="new-item-unit" value="م2" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">سعر الوحدة *</label>
+                        <input type="number" id="new-item-price" step="0.01" min="0" value="120" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">معدل الإنتاجية اليومي للفرقة *</label>
+                        <input type="number" id="new-item-prod" step="0.1" min="0.1" value="25" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-700 mb-1">عدد فرق العمل (Crews) *</label>
+                        <input type="number" id="new-item-crews" min="1" max="50" value="1" required
+                            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+                <div class="pt-3 border-t border-slate-200 flex justify-end gap-2">
+                    <button type="button" onclick="closeModal('add-item-modal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">إلغاء</button>
+                    <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm">إضافة وإعادة جدولة المشروع</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: Smart Import & Auto-Classifier (Excel / CSV / Raw Text) -->
+    <div id="import-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden">
+            <div class="bg-slate-800 text-white px-5 py-3.5 flex justify-between items-center">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i>
+                    الاستيراد الذكي وتصنيف جدول الكميات (BOQ Auto-Classifier)
+                </h3>
+                <button onclick="closeModal('import-modal')" class="text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="p-5 space-y-4 text-xs">
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-blue-900">
+                    <p class="font-bold mb-1"><i class="fa-solid fa-circle-info ml-1"></i> كيف يعمل المصنف الذكي؟</p>
+                    <p>يقوم النظام بتحليل وصف كل بند ومطابقته هندسياً لتصنيفه تلقائياً ضمن المراحل التسع الإلزامية (من الإزالة وحتى الفرش)، ثم يبني التبعيات (FS) ويحسب المدد والتدفقات المالية آلياً.</p>
+                </div>
+
+                <!-- Option A: Excel / CSV File Upload -->
+                <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center hover:border-emerald-500 transition bg-slate-50">
+                    <i class="fa-solid fa-file-excel text-3xl text-emerald-600 mb-2"></i>
+                    <p class="font-bold text-slate-800 mb-1">استيراد ملف Excel (.xlsx, .xls) أو CSV</p>
+                    <p class="text-slate-500 mb-3">الأعمدة المدعومة: الوصف (Description)، الكمية (Qty)، الوحدة (Unit)، السعر (Price)، الإنتاجية (Productivity)</p>
+                    <div class="flex justify-center gap-2">
+                        <label class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl cursor-pointer transition">
+                            <span>اختيار ملف من الجهاز</span>
+                            <input type="file" id="excel-file-input" accept=".xlsx,.xls,.csv" onchange="handleExcelUpload(event)" class="hidden">
+                        </label>
+                        <button type="button" onclick="downloadSampleTemplate()" class="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-bold rounded-xl transition">
+                            <i class="fa-solid fa-download ml-1"></i> تحميل نموذج Excel فارغ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Option B: Paste Raw Text / Tabular Data -->
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">أو الصق بنود المقايسة مباشرة (سطر لكل بند: الوصف | الكمية | الوحدة | السعر | الإنتاجية اليومية):</label>
+                    <textarea id="raw-boq-text" rows="5" placeholder="تكسير وإزالة بلاط الأرضيات القديم مع ترحيل المخلفات | 250 | م2 | 35 | 50&#10;تأسيس مواسير تغذية المياه PPR والصرف للحمامات والمطابخ | 4 | مقطوعية | 6500 | 1&#10;مد خراطيم الكهرباء وسحب الأسلاك وتركيب علب المفاتيح | 180 | نقطة | 95 | 20&#10;تركيب سيراميك أرضيات بورسلين مع الترويب | 250 | م2 | 140 | 25&#10;تركيب حلوق أبواب خشبية وشبابيك ألمنيوم | 18 | عدد | 1200 | 3&#10;أعمال معجون وصنفرة ودهان بلاستيك وجهين | 650 | م2 | 45 | 45&#10;تركيب ضلف الأبواب الخشبية والأقفال وزجاج الشبابيك | 18 | عدد | 950 | 4&#10;تركيب كشافات الإنارة الليد ووحدات التكييف السبليت | 24 | عدد | 1800 | 4&#10;توريد وتركيب دواليب المطبخ والأثاث والستائر | 1 | مقطوعية | 45000 | 0.25"
+                        class="w-full p-3 border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500 font-mono text-[11px]"></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+                    <label class="flex items-center gap-2 font-bold text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="replace-existing-boq" checked class="rounded text-blue-600">
+                        <span>استبدال البنود الحالية بالكامل (إلغاء التحديد للإضافة على الحالي)</span>
+                    </label>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="closeModal('import-modal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl">إلغاء</button>
+                        <button type="button" onclick="processRawTextImport()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-sm">
+                            <i class="fa-solid fa-gears ml-1"></i> تصنيف وبناء الجدول الزمني
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        /**
+         * 1. MANDATORY 9-PHASE TECHNICAL SEQUENCE DEFINITION
+         * Strict ordering & predecessor mapping rules without deviation.
+         */
+        const TECHNICAL_PHASES = [
+            {
+                id: 1,
+                code: "P1",
+                name: "إزالة الأعمال القديمة",
+                shortName: "1. الإزالة والترحيل",
+                desc: "تكسير، إزالة أرضيات، إزالة أطقم صحية وكهربائية قديمة، ترحيل مخلفات",
+                predecessorPhases: [], // Start of Project
+                color: "#64748b",
+                keywords: ["إزالة", "ازالة", "تكسير", "هدم", "ترحيل", "مخلفات", "فك", "خلع", "قديم", "قديمة"]
+            },
+            {
+                id: 2,
+                code: "P2",
+                name: "تنفيذ أعمال السباكة وتمديدات المياه",
+                shortName: "2. السباكة والمياه",
+                desc: "تأسيس مواسير التغذية والصرف، عزل الحمامات والمطابخ، واختبار الضغط",
+                predecessorPhases: [1], // After Demolition
+                color: "#0284c7",
+                keywords: ["سباكة", "مواسير", "تغذية", "صرف", "عزل", "ضغط", "حمامات", "مياه", "صحية", "خزان", "ppr", "pvc"]
+            },
+            {
+                id: 3,
+                code: "P3",
+                name: "تنفيذ أعمال تمديدات الكهرباء",
+                shortName: "3. تمديدات الكهرباء",
+                desc: "تكسير مسارات، مد خراطيم، سحب أسلاك، وتركيب علب المفاتيح واللوحات الفرعية",
+                predecessorPhases: [1], // Starts after Demolition (parallel to Plumbing, or linked cleanly before Tiling)
+                color: "#d97706",
+                keywords: ["تمديدات", "خراطيم", "أسلاك", "اسلاك", "كابلات", "علب", "لوحات", "تأسيس كهرباء", "مسارات", "دكت"]
+            },
+            {
+                id: 4,
+                code: "P4",
+                name: "تنفيذ أعمال البلاط والأرضيات",
+                shortName: "4. البلاط والأرضيات",
+                desc: "لياسة أرضيات/جدران حسب الحاجة، تركيب سيراميك أو بورسلين للأرضيات والجدران، وترويب",
+                predecessorPhases: [2, 3], // Must wait for BOTH Plumbing & Electrical rough-ins
+                color: "#0d9488",
+                keywords: ["بلاط", "أرضيات", "ارضيات", "سيراميك", "بورسلين", "رخام", "جرانيت", "ترويب", "لياسة", "وزرة", "باركيه"]
+            },
+            {
+                id: 5,
+                code: "P5",
+                name: "تنفيذ أعمال حلوق الأبواب والألمنيوم",
+                shortName: "5. الحلوق والألمنيوم",
+                desc: "تركيب حلوق الأبواب الخشبية والحديدية، وتركيب إطارات وشبابيك الألمنيوم",
+                predecessorPhases: [4], // After Tiling/Flooring levels are established
+                color: "#4f46e5",
+                keywords: ["حلوق", "حلق", "إطارات", "اطارات", "شبابيك ألمنيوم", "المنيوم", "ألمنيوم", "الومنيوم", "واجهات"]
+            },
+            {
+                id: 6,
+                code: "P6",
+                name: "تنفيذ أعمال الدهان",
+                shortName: "6. أعمال الدهان",
+                desc: "معجون، صنفرة، دهان أساس، ووجهين تشطيب للجدران والأسقف",
+                predecessorPhases: [5], // After Frames & Aluminum
+                color: "#9333ea",
+                keywords: ["دهان", "دهانات", "معجون", "صنفرة", "أساس", "اساس", "بلاستيك", "طلاء", "ورق جدران", "جبس", "أسقف"]
+            },
+            {
+                id: 7,
+                code: "P7",
+                name: "تشطيب الأبواب والشبابيك",
+                shortName: "7. تشطيب الأبواب",
+                desc: "تركيب ضلف الأبواب، الأقفال، المقابض، زجاج الشبابيك، والسلك",
+                predecessorPhases: [6], // After Painting to avoid paint stains
+                color: "#be123c",
+                keywords: ["ضلف", "ضلفة", "أقفال", "اقفال", "مقابض", "زجاج", "سلك", "اكسسوارات", "تشطيب أبواب", "باب"]
+            },
+            {
+                id: 8,
+                code: "P8",
+                name: "تشطيب الإنارة وتركيب الوحدات الداخلية للتكييف",
+                shortName: "8. الإنارة والتكييف",
+                desc: "تركيب كشافات الإنارة، الأفياش، المفاتيح، والوحدات الداخلية والخارجية للتكييف مع التشغيل التجريبي",
+                predecessorPhases: [6], // After Painting (parallel with Door leaves)
+                color: "#ea580c",
+                keywords: ["إنارة", "انارة", "كشافات", "أفياش", "افياش", "مفاتيح", "تكييف", "مكيف", "سبليت", "وحدات", "تشغيل تجريبي", "سبوت"]
+            },
+            {
+                id: 9,
+                code: "P9",
+                name: "أعمال الفرش للغرف والمطابخ",
+                shortName: "9. الفرش والتسليم",
+                desc: "تركيب دواليب المطبخ، الأثاث، الستائر، والتسليم النهائي",
+                predecessorPhases: [7, 8], // Final Phase after Doors & MEP Fixtures
+                color: "#15803d",
+                keywords: ["فرش", "مطبخ", "مطابخ", "دواليب", "أثاث", "اثاث", "ستائر", "تسليم", "تأثيث", "مكاتب"]
+            }
+        ];
+
+        /**
+         * 2. DEFAULT REALISTIC ENGINEERING BOQ DATASET
+         */
+        const DEFAULT_BOQ_ITEMS = [
+            // Phase 1
+            { id: 101, phaseId: 1, name: "تكسير وإزالة البلاط والأرضيات القديمة وترحيل المخلفات", qty: 320, unit: "م2", unitPrice: 35, productivity: 65, crews: 1, actualPct: 100 },
+            { id: 102, phaseId: 1, name: "فك وإزالة الأطقم الصحية والتركيبات الكهربائية القديمة", qty: 1, unit: "مقطوعية", unitPrice: 4500, productivity: 0.5, crews: 1, actualPct: 100 },
+            // Phase 2
+            { id: 201, phaseId: 2, name: "تأسيس مواسير تغذية المياه الحرارية PPR والصرف الصحي", qty: 140, unit: "م.ط", unitPrice: 85, productivity: 35, crews: 1, actualPct: 100 },
+            { id: 202, phaseId: 2, name: "عزل مائي بيتوميني/أسمنتي لأرضيات الحمامات والمطابخ مع اختبار الغمر", qty: 65, unit: "م2", unitPrice: 75, productivity: 22, crews: 1, actualPct: 100 },
+            // Phase 3
+            { id: 301, phaseId: 3, name: "تكسير مسارات ومد خراطيم الكهرباء والبيانات في الجدران والأسقف", qty: 450, unit: "م.ط", unitPrice: 30, productivity: 90, crews: 1, actualPct: 100 },
+            { id: 302, phaseId: 3, name: "سحب الأسلاك الكهربائية وتركيب علب المفاتيح واللوحات الفرعية", qty: 210, unit: "نقطة", unitPrice: 95, productivity: 42, crews: 1, actualPct: 85 },
+            // Phase 4
+            { id: 401, phaseId: 4, name: "أعمال لياسة وتخشين الجدران والأرضيات حسب المناسيب", qty: 380, unit: "م2", unitPrice: 42, productivity: 65, crews: 1, actualPct: 60 },
+            { id: 402, phaseId: 4, name: "توريد وتركيب سيراميك وبورسلين للأرضيات والجدران مع الترويب", qty: 320, unit: "م2", unitPrice: 145, productivity: 40, crews: 1, actualPct: 30 },
+            // Phase 5
+            { id: 501, phaseId: 5, name: "توريد وتركيب حلوق الأبواب الخشبية والحديدية", qty: 18, unit: "عدد", unitPrice: 450, productivity: 6, crews: 1, actualPct: 0 },
+            { id: 502, phaseId: 5, name: "توريد وتركيب إطارات وشبابيك الألمنيوم دبل جلاس", qty: 42, unit: "م2", unitPrice: 680, productivity: 10.5, crews: 1, actualPct: 0 },
+            // Phase 6
+            { id: 601, phaseId: 6, name: "أعمال معجون وصنفرة وتأسيس للجدران والأسقف", qty: 850, unit: "م2", unitPrice: 28, productivity: 140, crews: 1, actualPct: 0 },
+            { id: 602, phaseId: 6, name: "دهان تشطيب نهائي وجهين بلاستيك عالي الجودة", qty: 850, unit: "م2", unitPrice: 24, productivity: 170, crews: 1, actualPct: 0 },
+            // Phase 7
+            { id: 701, phaseId: 7, name: "تركيب ضلف الأبواب الخشبية والأقفال والمقابض والاكسسوارات", qty: 18, unit: "عدد", unitPrice: 1150, productivity: 4.5, crews: 1, actualPct: 0 },
+            { id: 702, phaseId: 7, name: "تركيب زجاج الشبابيك وشبك الحماية من الحشرات وضبط السكك", qty: 14, unit: "شباك", unitPrice: 320, productivity: 7, crews: 1, actualPct: 0 },
+            // Phase 8
+            { id: 801, phaseId: 8, name: "تركيب كشافات الإنارة الليد والأفياش والمفاتيح الكهربائية", qty: 210, unit: "نقطة", unitPrice: 85, productivity: 55, crews: 1, actualPct: 0 },
+            { id: 802, phaseId: 8, name: "توريد وتركيب الوحدات الداخلية والخارجية للتكييف والتشغيل التجريبي", qty: 12, unit: "وحدة", unitPrice: 3400, productivity: 3, crews: 1, actualPct: 0 },
+            // Phase 9
+            { id: 901, phaseId: 9, name: "توريد وتركيب دواليب المطبخ العلوية والسفلية مع الرخام", qty: 14, unit: "م.ط", unitPrice: 1950, productivity: 3.5, crews: 1, actualPct: 0 },
+            { id: 902, phaseId: 9, name: "توريد وتركيب الأثاث والستائر وأعمال النظافة والتسليم النهائي", qty: 1, unit: "مقطوعية", unitPrice: 48000, productivity: 0.25, crews: 1, actualPct: 0 }
+        ];
+
+        /**
+         * 3. APPLICATION STATE
+         */
+        let appState = {
+            projectName: "مشروع تأهيل وتشطيب مبنى إداري وسكني متكامل",
+            startDate: "",
+            dataDate: "",
+            workDaysPerWeek: 6,
+            currency: "ر.س",
+            items: [],
+            ganttZoom: "day",
+            collapsedPhases: {}
+        };
+
+        let computedSchedule = {
+            tasks: [],
+            phasesSummary: [],
+            projectStartDate: null,
+            projectEndDate: null,
+            totalWorkDays: 0,
+            totalCost: 0,
+            plannedPct: 0,
+            actualPct: 0,
+            financialPct: 0,
+            earnedValue: 0,
+            plannedValueToDate: 0,
+            timelineDays: []
+        };
+
+        let scurveChartInstance = null;
+        let cashflowChartInstance = null;
+
+        /**
+         * 4. INITIALIZATION & STORAGE
+         */
+        window.onload = function () {
+            populatePhaseSelects();
+            loadFromStorageOrInit();
+            recalculateAll();
+        };
+
+        function populatePhaseSelects() {
+            const filterSelect = document.getElementById('boq-phase-filter');
+            const newItemSelect = document.getElementById('new-item-phase');
+            const stepper = document.getElementById('phases-stepper');
+
+            TECHNICAL_PHASES.forEach(p => {
+                // Filter dropdown
+                const opt1 = document.createElement('option');
+                opt1.value = p.id;
+                opt1.textContent = `${p.id}. ${p.name}`;
+                filterSelect.appendChild(opt1);
+
+                // Modal dropdown
+                const opt2 = document.createElement('option');
+                opt2.value = p.id;
+                opt2.textContent = `${p.id}. ${p.name}`;
+                newItemSelect.appendChild(opt2);
+
+                // Top Stepper Strip
+                const stepDiv = document.createElement('div');
+                stepDiv.className = "bg-slate-900/80 border border-slate-700 rounded-lg px-2 py-1.5 flex items-center gap-1.5 truncate";
+                stepDiv.title = `${p.id}. ${p.name}: ${p.desc}`;
+                stepDiv.innerHTML = `
+                    <span class="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center text-white shrink-0" style="background-color:${p.color}">${p.id}</span>
+                    <span class="truncate text-slate-200 font-medium">${p.shortName.replace(/^\d+\.\s*/, '')}</span>
+                `;
+                stepper.appendChild(stepDiv);
+            });
+        }
+
+        function loadFromStorageOrInit() {
+            const saved = localStorage.getItem('eng_schedule_project_v1');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appState = { ...appState, ...parsed };
+                    syncInputsFromState();
+                    return;
+                } catch (e) {
+                    console.error("Failed to parse saved state", e);
+                }
+            }
+            initDefaultDatesAndData();
+        }
+
+        function initDefaultDatesAndData() {
+            const today = new Date();
+            // Set start date to 14 working days ago so there is realistic progress to visualize
+            const start = new Date(today);
+            start.setDate(start.getDate() - 16);
+            
+            appState.projectName = "مشروع تأهيل وتشطيب مبنى إداري وسكني متكامل";
+            appState.startDate = formatDateISO(start);
+            appState.dataDate = formatDateISO(today);
+            appState.workDaysPerWeek = 6;
+            appState.currency = "ر.س";
+            appState.items = JSON.parse(JSON.stringify(DEFAULT_BOQ_ITEMS));
+            appState.collapsedPhases = {};
+            syncInputsFromState();
+        }
+
+        function syncInputsFromState() {
+            document.getElementById('project-name').value = appState.projectName;
+            document.getElementById('project-start').value = appState.startDate;
+            document.getElementById('project-data-date').value = appState.dataDate;
+            document.getElementById('work-days-week').value = appState.workDaysPerWeek;
+            document.getElementById('currency-symbol').value = appState.currency;
+        }
+
+        function saveProjectToStorage() {
+            localStorage.setItem('eng_schedule_project_v1', JSON.stringify(appState));
+            showToast("تم حفظ بيانات المشروع والبرنامج الزمني بنجاح في المتصفح.", "success");
+        }
+
+        function resetToDefaultProject() {
+            localStorage.removeItem('eng_schedule_project_v1');
+            initDefaultDatesAndData();
+            recalculateAll();
+            showToast("تمت استعادة بيانات المشروع الافتراضية.", "info");
+        }
+
+        function updateSettings() {
+            appState.projectName = document.getElementById('project-name').value || "مشروع هندسي";
+            appState.startDate = document.getElementById('project-start').value;
+            appState.dataDate = document.getElementById('project-data-date').value;
+            appState.workDaysPerWeek = parseInt(document.getElementById('work-days-week').value) || 6;
+            appState.currency = document.getElementById('currency-symbol').value || "ر.س";
+            recalculateAll();
+        }
+
+        /**
+         * 5. CALENDAR & WORKING DAYS ENGINE
+         */
+        function parseDateLocal(isoStr) {
+            if (!isoStr) return new Date();
+            const [y, m, d] = isoStr.split('-').map(Number);
+            return new Date(y, m - 1, d, 0, 0, 0, 0);
+        }
+
+        function formatDateISO(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function formatDateDisplay(date) {
+            if (!date) return "-";
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = date.getFullYear();
+            return `${y}/${m}/${d}`;
+        }
+
+        function isWorkingDay(date, workDaysPerWeek) {
+            const day = date.getDay(); // 0 = Sun, 5 = Fri, 6 = Sat
+            if (workDaysPerWeek === 7) return true;
+            if (workDaysPerWeek === 6) return day !== 5; // Friday off
+            if (workDaysPerWeek === 5) return day !== 5 && day !== 6; // Fri & Sat off
+            return day !== 5;
+        }
+
+        // Returns the first valid working day on or after `date`
+        function snapToNextWorkingDay(date, workDaysPerWeek) {
+            const d = new Date(date);
+            while (!isWorkingDay(d, workDaysPerWeek)) {
+                d.setDate(d.getDate() + 1);
+            }
+            return d;
+        }
+
+        // Adds `offsetWorkDays` (0-indexed: duration 1 starts and ends on same day)
+        function addWorkingDays(startDate, workDaysCount, workDaysPerWeek) {
+            let current = snapToNextWorkingDay(startDate, workDaysPerWeek);
+            if (workDaysCount <= 1) return current;
+            let added = 1;
+            while (added < workDaysCount) {
+                current.setDate(current.getDate() + 1);
+                if (isWorkingDay(current, workDaysPerWeek)) {
+                    added++;
+                }
+            }
+            return current;
+        }
+
+        // Next working day strictly after `finishDate`
+        function getNextWorkingDayAfter(finishDate, workDaysPerWeek) {
+            const next = new Date(finishDate);
+            next.setDate(next.getDate() + 1);
+            return snapToNextWorkingDay(next, workDaysPerWeek);
+        }
+
+        /**
+         * 6. CPM SCHEDULING ENGINE (FORWARD & BACKWARD PASS)
+         * Enforces the strict 9-phase technical sequence and sequential/parallel logic within phases.
+         */
+        function recalculateAll() {
+            const workDaysPerWeek = appState.workDaysPerWeek;
+            const rawStart = parseDateLocal(appState.startDate);
+            const projectStart = snapToNextWorkingDay(rawStart, workDaysPerWeek);
+            const dataDate = parseDateLocal(appState.dataDate);
+
+            // 1. Sort items strictly by Technical Phase ID (1 -> 9), preserving internal order
+            const sortedItems = [...appState.items].sort((a, b) => a.phaseId - b.phaseId);
+
+            // Group items by phase
+            const phaseGroups = {};
+            TECHNICAL_PHASES.forEach(p => phaseGroups[p.id] = []);
+            sortedItems.forEach(item => {
+                if (!phaseGroups[item.phaseId]) phaseGroups[item.phaseId] = [];
+                phaseGroups[item.phaseId].push(item);
+            });
+
+            // Build Task Nodes with WBS and Predecessors
+            const taskNodes = [];
+            const taskMap = {};
+
+            TECHNICAL_PHASES.forEach(phase => {
+                const itemsInPhase = phaseGroups[phase.id];
+                itemsInPhase.forEach((item, idx) => {
+                    const wbs = `${phase.id}.${idx + 1}`;
+                    const totalCost = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
+                    const dailyOutput = (Number(item.productivity) || 1) * (Number(item.crews) || 1);
+                    const duration = Math.max(1, Math.ceil((Number(item.qty) || 1) / Math.max(0.0001, dailyOutput)));
+
+                    // Determine Predecessors (FS):
+                    // - First item in Phase P depends on the LAST item of each non-empty predecessor phase of P.
+                    // - Subsequent items in Phase P follow sequentially (FS) within that phase for logical crew flow.
+                    let preds = [];
+                    if (idx === 0) {
+                        phase.predecessorPhases.forEach(predPhaseId => {
+                            // Find nearest preceding phase that has tasks
+                            const predTasks = findEffectivePredecessorTasks(predPhaseId, phaseGroups, taskNodes);
+                            predTasks.forEach(pt => {
+                                if (!preds.includes(pt.id)) preds.push(pt.id);
+                            });
+                        });
+                    } else {
+                        const prevItemInPhase = itemsInPhase[idx - 1];
+                        preds.push(prevItemInPhase.id);
+                    }
+
+                    const node = {
+                        ...item,
+                        wbs,
+                        phaseName: phase.name,
+                        phaseColor: phase.color,
+                        totalCost,
+                        duration,
+                        predecessors: preds,
+                        successors: [],
+                        esWorkDay: 0, // 0-indexed working day offset from project start
+                        efWorkDay: 0,
+                        lsWorkDay: 0,
+                        lfWorkDay: 0,
+                        totalFloat: 0,
+                        isCritical: false,
+                        startDate: null,
+                        finishDate: null,
+                        plannedPct: 0,
+                        earnedValue: 0
+                    };
+                    taskNodes.push(node);
+                    taskMap[node.id] = node;
+                });
+            });
+
+            // Populate Successors
+            taskNodes.forEach(t => {
+                t.predecessors.forEach(pid => {
+                    if (taskMap[pid]) {
+                        taskMap[pid].successors.push(t.id);
+                    }
+                });
+            });
+
+            // FORWARD PASS (Working Day Offsets)
+            taskNodes.forEach(t => {
+                if (t.predecessors.length === 0) {
+                    t.esWorkDay = 0;
+                } else {
+                    let maxPredEF = 0;
+                    t.predecessors.forEach(pid => {
+                        if (taskMap[pid]) {
+                            maxPredEF = Math.max(maxPredEF, taskMap[pid].efWorkDay);
+                        }
+                    });
+                    t.esWorkDay = maxPredEF;
+                }
+                t.efWorkDay = t.esWorkDay + t.duration;
+            });
+
+            const projectTotalWorkDays = taskNodes.reduce((max, t) => Math.max(max, t.efWorkDay), 0);
+
+            // BACKWARD PASS (Total Float & Critical Path)
+            for (let i = taskNodes.length - 1; i >= 0; i--) {
+                const t = taskNodes[i];
+                if (t.successors.length === 0) {
+                    t.lfWorkDay = projectTotalWorkDays;
+                } else {
+                    let minSuccLS = Infinity;
+                    t.successors.forEach(sid => {
+                        if (taskMap[sid]) {
+                            minSuccLS = Math.min(minSuccLS, taskMap[sid].lsWorkDay);
+                        }
+                    });
+                    t.lfWorkDay = minSuccLS === Infinity ? projectTotalWorkDays : minSuccLS;
+                }
+                t.lsWorkDay = t.lfWorkDay - t.duration;
+                t.totalFloat = Math.max(0, t.lsWorkDay - t.esWorkDay);
+                t.isCritical = (t.totalFloat === 0);
+            }
+
+            // Map Working Day Offsets to Actual Calendar Dates & Calculate Planned Progress %
+            let totalCost = 0;
+            let totalPlannedValue = 0;
+            let totalEarnedValue = 0;
+            let projectEndDate = new Date(projectStart);
+
+            taskNodes.forEach(t => {
+                // Start date is projectStart + esWorkDay working days
+                t.startDate = addWorkingDays(projectStart, t.esWorkDay + 1, workDaysPerWeek);
+                t.finishDate = addWorkingDays(t.startDate, t.duration, workDaysPerWeek);
+                if (t.finishDate > projectEndDate) {
+                    projectEndDate = new Date(t.finishDate);
+                }
+
+                // Calculate Planned % as of Data Date
+                if (dataDate < t.startDate) {
+                    t.plannedPct = 0;
+                } else if (dataDate >= t.finishDate) {
+                    t.plannedPct = 100;
+                } else {
+                    // Count elapsed working days between startDate and dataDate inclusive
+                    const elapsedWorkDays = countWorkingDaysBetween(t.startDate, dataDate, workDaysPerWeek);
+                    t.plannedPct = Math.min(100, Math.max(0, (elapsedWorkDays / t.duration) * 100));
+                }
+
+                const pv = t.totalCost * (t.plannedPct / 100);
+                const ev = t.totalCost * ((Number(t.actualPct) || 0) / 100);
+                t.plannedValue = pv;
+                t.earnedValue = ev;
+
+                totalCost += t.totalCost;
+                totalPlannedValue += pv;
+                totalEarnedValue += ev;
+            });
+
+            // Build Phase Summaries
+            const phasesSummary = TECHNICAL_PHASES.map(phase => {
+                const pTasks = taskNodes.filter(t => t.phaseId === phase.id);
+                const pCost = pTasks.reduce((s, t) => s + t.totalCost, 0);
+                const pPV = pTasks.reduce((s, t) => s + t.plannedValue, 0);
+                const pEV = pTasks.reduce((s, t) => s + t.earnedValue, 0);
+                const pStart = pTasks.length ? new Date(Math.min(...pTasks.map(t => t.startDate))) : null;
+                const pFinish = pTasks.length ? new Date(Math.max(...pTasks.map(t => t.finishDate))) : null;
+                const pCritical = pTasks.some(t => t.isCritical);
+
+                return {
+                    ...phase,
+                    tasks: pTasks,
+                    count: pTasks.length,
+                    totalCost: pCost,
+                    weightPct: totalCost > 0 ? (pCost / totalCost) * 100 : 0,
+                    plannedPct: pCost > 0 ? (pPV / pCost) * 100 : 0,
+                    actualPct: pCost > 0 ? (pEV / pCost) * 100 : 0,
+                    earnedValue: pEV,
+                    financialPct: totalCost > 0 ? (pEV / totalCost) * 100 : 0,
+                    startDate: pStart,
+                    finishDate: pFinish,
+                    isCritical: pCritical
+                };
+            });
+
+            computedSchedule = {
+                tasks: taskNodes,
+                phasesSummary,
+                projectStartDate: projectStart,
+                projectEndDate: taskNodes.length > 0 ? projectEndDate : projectStart,
+                totalWorkDays: projectTotalWorkDays,
+                totalCost,
+                plannedPct: totalCost > 0 ? (totalPlannedValue / totalCost) * 100 : 0,
+                actualPct: totalCost > 0 ? (totalEarnedValue / totalCost) * 100 : 0,
+                financialPct: totalCost > 0 ? (totalEarnedValue / totalCost) * 100 : 0,
+                earnedValue: totalEarnedValue,
+                plannedValueToDate: totalPlannedValue
+            };
+
+            updateKPICards();
+            renderBOQTable();
+            renderGanttChart();
+            renderCashFlowAndCharts();
+        }
+
+        // Helper: if a predecessor phase has 0 tasks, walk back recursively to preserve chain
+        function findEffectivePredecessorTasks(phaseId, phaseGroups, existingNodes) {
+            const items = phaseGroups[phaseId] || [];
+            if (items.length > 0) {
+                return [items[items.length - 1]];
+            }
+            const phaseObj = TECHNICAL_PHASES.find(p => p.id === phaseId);
+            if (!phaseObj || phaseObj.predecessorPhases.length === 0) return [];
+            let res = [];
+            phaseObj.predecessorPhases.forEach(pid => {
+                res = res.concat(findEffectivePredecessorTasks(pid, phaseGroups, existingNodes));
+            });
+            return res;
+        }
+
+        function countWorkingDaysBetween(start, end, workDaysPerWeek) {
+            let count = 0;
+            const cur = new Date(start);
+            while (cur <= end) {
+                if (isWorkingDay(cur, workDaysPerWeek)) count++;
+                cur.setDate(cur.getDate() + 1);
+            }
+            return count;
+        }
+
+        /**
+         * 7. UPDATE KPI EXECUTIVE CARDS
+         */
+        function updateKPICards() {
+            const cur = appState.currency;
+            const s = computedSchedule;
+
+            document.getElementById('kpi-total-cost').textContent = `${formatNumber(s.totalCost)} ${cur}`;
+            document.getElementById('kpi-items-count').textContent = s.tasks.length;
+            document.getElementById('kpi-duration').textContent = `${s.totalWorkDays} يوم عمل`;
+            document.getElementById('kpi-end-date').textContent = formatDateDisplay(s.projectEndDate);
+
+            document.getElementById('kpi-planned-pct').textContent = `${s.plannedPct.toFixed(1)}%`;
+            document.getElementById('bar-planned-pct').style.width = `${Math.min(100, s.plannedPct)}%`;
+
+            document.getElementById('kpi-actual-pct').textContent = `${s.actualPct.toFixed(1)}%`;
+            document.getElementById('bar-actual-pct').style.width = `${Math.min(100, s.actualPct)}%`;
+
+            const sv = s.actualPct - s.plannedPct;
+            const svBadge = document.getElementById('kpi-sv-badge');
+            svBadge.textContent = `${sv >= 0 ? '+' : ''}${sv.toFixed(1)}%`;
+            if (sv >= 0) {
+                svBadge.className = "font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700";
+            } else if (sv > -5) {
+                svBadge.className = "font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700";
+            } else {
+                svBadge.className = "font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700";
+            }
+
+            document.getElementById('kpi-financial-pct').textContent = `${s.financialPct.toFixed(1)}%`;
+            document.getElementById('kpi-earned-value').textContent = `${formatNumber(s.earnedValue)} ${cur}`;
+        }
+
+        /**
+         * 8. RENDER TAB 1: BOQ & WBS TABLE
+         */
+        function renderBOQTable() {
+            const tbody = document.getElementById('boq-table-body');
+            const search = (document.getElementById('boq-search').value || '').trim().toLowerCase();
+            const phaseFilter = document.getElementById('boq-phase-filter').value;
+            const cur = appState.currency;
+
+            tbody.innerHTML = '';
+
+            computedSchedule.phasesSummary.forEach(phase => {
+                if (phaseFilter !== 'all' && String(phase.id) !== phaseFilter) return;
+
+                const filteredTasks = phase.tasks.filter(t => !search || t.name.toLowerCase().includes(search));
+                if (filteredTasks.length === 0 && search) return;
+
+                // Phase Group Header Row
+                const phaseRow = document.createElement('tr');
+                phaseRow.className = "bg-slate-100/90 font-bold text-slate-800 border-t-2 border-slate-300";
+                phaseRow.innerHTML = `
+                    <td class="p-2.5 text-center">
+                        <span class="px-2 py-0.5 rounded text-white text-[11px]" style="background-color:${phase.color}">${phase.code}</span>
+                    </td>
+                    <td colspan="5" class="p-2.5">
+                        <div class="flex items-center gap-2">
+                            <span>المرحلة ${phase.id}: ${phase.name}</span>
+                            <span class="text-[11px] font-normal text-slate-500">(${phase.count} بنود)</span>
+                        </div>
+                    </td>
+                    <td class="p-2.5 text-center text-blue-800">${formatNumber(phase.totalCost)} ${cur}</td>
+                    <td colspan="2" class="p-2.5 text-center text-[11px] text-slate-500">الوزن: ${phase.weightPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center text-slate-700">-</td>
+                    <td class="p-2.5 text-center text-[11px] text-slate-600">${formatDateDisplay(phase.startDate)}</td>
+                    <td class="p-2.5 text-center text-[11px] text-slate-600">${formatDateDisplay(phase.finishDate)}</td>
+                    <td class="p-2.5 text-center">
+                        ${phase.isCritical ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px]">مسار حرج</span>' : '<span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px]">عادي</span>'}
+                    </td>
+                    <td class="p-2.5 text-center text-sky-700">${phase.plannedPct.toFixed(0)}%</td>
+                    <td class="p-2.5 text-center text-emerald-700">${phase.actualPct.toFixed(0)}%</td>
+                    <td class="p-2.5"></td>
+                `;
+                tbody.appendChild(phaseRow);
+
+                if (filteredTasks.length === 0) {
+                    const emptyRow = document.createElement('tr');
+                    emptyRow.innerHTML = `<td colspan="16" class="p-3 text-center text-slate-400 italic">لا توجد بنود مضافة في هذه المرحلة حالياً</td>`;
+                    tbody.appendChild(emptyRow);
+                }
+
+                filteredTasks.forEach(task => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-blue-50/40 transition";
+
+                    const phaseOptions = TECHNICAL_PHASES.map(p =>
+                        `<option value="${p.id}" ${p.id === task.phaseId ? 'selected' : ''}>${p.id}. ${p.shortName.replace(/^\d+\.\s*/, '')}</option>`
+                    ).join('');
+
+                    tr.innerHTML = `
+                        <td class="p-2 text-center font-mono font-bold text-slate-600 border-l border-slate-100">${task.wbs}</td>
+                        <td class="p-2 font-semibold text-slate-800 border-l border-slate-100">
+                            <input type="text" value="${escapeHtml(task.name)}" onchange="updateItemField(${task.id}, 'name', this.value)"
+                                class="w-full bg-transparent hover:bg-white focus:bg-white px-1.5 py-1 rounded border border-transparent focus:border-blue-400 focus:outline-none">
+                        </td>
+                        <td class="p-2 border-l border-slate-100">
+                            <select onchange="updateItemField(${task.id}, 'phaseId', parseInt(this.value))"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-semibold text-slate-700 focus:outline-none focus:border-blue-500">
+                                ${phaseOptions}
+                            </select>
+                        </td>
+                        <td class="p-2 text-center border-l border-slate-100">
+                            <input type="number" step="0.1" min="0.1" value="${task.qty}" onchange="updateItemField(${task.id}, 'qty', parseFloat(this.value))"
+                                class="w-16 text-center bg-slate-50 border border-slate-200 rounded px-1 py-0.5 font-semibold">
+                        </td>
+                        <td class="p-2 text-center text-slate-600 border-l border-slate-100">${escapeHtml(task.unit)}</td>
+                        <td class="p-2 text-center border-l border-slate-100">
+                            <input type="number" step="1" min="0" value="${task.unitPrice}" onchange="updateItemField(${task.id}, 'unitPrice', parseFloat(this.value))"
+                                class="w-20 text-center bg-slate-50 border border-slate-200 rounded px-1 py-0.5 font-semibold">
+                        </td>
+                        <td class="p-2 text-center font-bold text-slate-800 border-l border-slate-100">${formatNumber(task.totalCost)}</td>
+                        <td class="p-2 text-center border-l border-slate-100">
+                            <input type="number" step="0.1" min="0.1" value="${task.productivity}" onchange="updateItemField(${task.id}, 'productivity', parseFloat(this.value))"
+                                class="w-16 text-center bg-slate-50 border border-slate-200 rounded px-1 py-0.5">
+                        </td>
+                        <td class="p-2 text-center border-l border-slate-100">
+                            <input type="number" min="1" max="50" value="${task.crews}" onchange="updateItemField(${task.id}, 'crews', parseInt(this.value))"
+                                class="w-12 text-center bg-slate-50 border border-slate-200 rounded px-1 py-0.5 font-bold text-blue-700">
+                        </td>
+                        <td class="p-2 text-center font-extrabold text-indigo-700 bg-indigo-50/40 border-l border-slate-100">${task.duration}</td>
+                        <td class="p-2 text-center text-[11px] text-slate-600 border-l border-slate-100">${formatDateDisplay(task.startDate)}</td>
+                        <td class="p-2 text-center text-[11px] text-slate-600 border-l border-slate-100">${formatDateDisplay(task.finishDate)}</td>
+                        <td class="p-2 text-center border-l border-slate-100">
+                            ${task.isCritical
+                                ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 font-bold text-[10px]"><i class="fa-solid fa-fire"></i> حرج (0)</span>`
+                                : `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-[10px]">سماحية ${task.totalFloat}ي</span>`
+                            }
+                        </td>
+                        <td class="p-2 text-center font-bold text-sky-700 border-l border-slate-100">${task.plannedPct.toFixed(0)}%</td>
+                        <td class="p-2 border-l border-slate-100 bg-emerald-50/30">
+                            <div class="flex items-center gap-1.5">
+                                <input type="range" min="0" max="100" step="5" value="${task.actualPct}"
+                                    oninput="updateItemField(${task.id}, 'actualPct', parseFloat(this.value))"
+                                    class="w-20 cursor-pointer">
+                                <span class="w-9 text-left font-bold text-emerald-700 text-[11px]">${task.actualPct}%</span>
+                            </div>
+                        </td>
+                        <td class="p-2 text-center no-print">
+                            <button onclick="deleteItem(${task.id})" class="text-slate-400 hover:text-rose-600 transition p-1" title="حذف البند">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function updateItemField(id, field, value) {
+            const item = appState.items.find(i => i.id === id);
+            if (!item) return;
+            if (typeof value === 'number' && isNaN(value)) return;
+            item[field] = value;
+            recalculateAll();
+        }
+
+        function deleteItem(id) {
+            appState.items = appState.items.filter(i => i.id !== id);
+            recalculateAll();
+            showToast("تم حذف البند وتحديث البرنامج الزمني.", "info");
+        }
+
+        function simulateProgressToDataDate() {
+            computedSchedule.tasks.forEach(t => {
+                const orig = appState.items.find(i => i.id === t.id);
+                if (orig) {
+                    orig.actualPct = Math.round(t.plannedPct);
+                }
+            });
+            recalculateAll();
+            showToast("تمت محاكاة نسب الإنجاز الفعلي لتطابق المخطط حتى تاريخ المتابعة.", "success");
+        }
+
+        /**
+         * 9. RENDER TAB 2: INTERACTIVE GANTT CHART
+         */
+        function setGanttZoom(zoom) {
+            appState.ganttZoom = zoom;
+            document.getElementById('zoom-day').className = zoom === 'day'
+                ? "px-3 py-1 rounded-md text-xs font-bold bg-white text-blue-700 shadow-sm transition"
+                : "px-3 py-1 rounded-md text-xs font-bold text-slate-600 hover:text-slate-900 transition";
+            document.getElementById('zoom-week').className = zoom === 'week'
+                ? "px-3 py-1 rounded-md text-xs font-bold bg-white text-blue-700 shadow-sm transition"
+                : "px-3 py-1 rounded-md text-xs font-bold text-slate-600 hover:text-slate-900 transition";
+            renderGanttChart();
+        }
+
+        function toggleGanttPhase(phaseId) {
+            appState.collapsedPhases[phaseId] = !appState.collapsedPhases[phaseId];
+            renderGanttChart();
+        }
+
+        function toggleAllGanttPhases() {
+            const anyExpanded = TECHNICAL_PHASES.some(p => !appState.collapsedPhases[p.id]);
+            TECHNICAL_PHASES.forEach(p => {
+                appState.collapsedPhases[p.id] = anyExpanded;
+            });
+            renderGanttChart();
+        }
+
+        function renderGanttChart() {
+            const wrapper = document.getElementById('gantt-wrapper');
+            const s = computedSchedule;
+            if (!s.tasks.length) {
+                wrapper.innerHTML = `<div class="p-8 text-center text-slate-500 text-sm">لا توجد أنشطة لعرضها في المخطط الزمني.</div>`;
+                return;
+            }
+
+            // Build calendar days array from projectStartDate to projectEndDate + 2 days buffer
+            const startCal = new Date(s.projectStartDate);
+            const endCal = new Date(s.projectEndDate);
+            endCal.setDate(endCal.getDate() + 2);
+
+            const calDays = [];
+            const cursor = new Date(startCal);
+            while (cursor <= endCal) {
+                calDays.push(new Date(cursor));
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            const dayWidth = appState.ganttZoom === 'day' ? 34 : 14;
+            const timelineWidth = calDays.length * dayWidth;
+            const dataDate = parseDateLocal(appState.dataDate);
+
+            // Calculate Data Date X offset (from right in RTL)
+            let dataDateOffsetPx = -1;
+            const diffDaysFromStart = Math.floor((dataDate - startCal) / (1000 * 60 * 60 * 24));
+            if (diffDaysFromStart >= 0 && diffDaysFromStart <= calDays.length) {
+                dataDateOffsetPx = (diffDaysFromStart + 0.5) * dayWidth;
+            }
+
+            // Header Timeline Cells
+            let headerCellsHtml = '';
+            calDays.forEach((d, idx) => {
+                const isWork = isWorkingDay(d, appState.workDaysPerWeek);
+                const dayNum = d.getDate();
+                const monthShort = d.toLocaleDateString('ar-EG', { month: 'short' });
+                const showLabel = appState.ganttZoom === 'day' || d.getDay() === 0 || idx === 0;
+                headerCellsHtml += `
+                    <div style="width:${dayWidth}px; min-width:${dayWidth}px;"
+                         class="border-l border-slate-700 flex flex-col items-center justify-center text-[10px] py-1 ${!isWork ? 'bg-slate-900/60 text-slate-500' : 'text-slate-200'}">
+                        ${showLabel ? `<span class="font-bold">${dayNum}</span><span class="text-[9px] text-slate-400">${monthShort}</span>` : ''}
+                    </div>
+                `;
+            });
+
+            // Rows HTML
+            let rowsHtml = '';
+            s.phasesSummary.forEach(phase => {
+                if (phase.count === 0) return;
+                const isCollapsed = !!appState.collapsedPhases[phase.id];
+
+                // Phase Summary Bar Calculation
+                const pStartIdx = Math.max(0, Math.round((phase.startDate - startCal) / (1000 * 60 * 60 * 24)));
+                const pEndIdx = Math.max(pStartIdx, Math.round((phase.finishDate - startCal) / (1000 * 60 * 60 * 24)));
+                const pRightPx = pStartIdx * dayWidth;
+                const pWidthPx = Math.max(dayWidth, (pEndIdx - pStartIdx + 1) * dayWidth);
+
+                rowsHtml += `
+                    <div class="flex border-b border-slate-300 bg-slate-100/90 hover:bg-slate-200/70 transition">
+                        <div onclick="toggleGanttPhase(${phase.id})"
+                             class="w-72 min-w-[288px] sticky right-0 z-20 bg-slate-100 border-l border-slate-300 px-3 py-2 flex items-center justify-between cursor-pointer select-none">
+                            <div class="flex items-center gap-2 truncate">
+                                <i class="fa-solid ${isCollapsed ? 'fa-caret-left' : 'fa-caret-down'} text-slate-500 w-3"></i>
+                                <span class="w-2.5 h-2.5 rounded-sm shrink-0" style="background-color:${phase.color}"></span>
+                                <span class="text-xs font-extrabold text-slate-800 truncate">${phase.id}. ${phase.name}</span>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-600 shrink-0">${phase.actualPct.toFixed(0)}%</span>
+                        </div>
+                        <div class="relative flex-1 h-9" style="width:${timelineWidth}px; min-width:${timelineWidth}px;">
+                            ${renderWeekendColumns(calDays, dayWidth)}
+                            <!-- Phase Bracket Bar -->
+                            <div style="right:${pRightPx}px; width:${pWidthPx}px; background-color:${phase.color};"
+                                 class="absolute top-2.5 h-3.5 rounded-sm opacity-85 shadow-sm flex items-center">
+                                <div style="width:${phase.actualPct}%" class="h-full bg-slate-950/50 rounded-r-sm"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (!isCollapsed) {
+                    phase.tasks.forEach(task => {
+                        const tStartIdx = Math.max(0, Math.round((task.startDate - startCal) / (1000 * 60 * 60 * 24)));
+                        const tEndIdx = Math.max(tStartIdx, Math.round((task.finishDate - startCal) / (1000 * 60 * 60 * 24)));
+                        const tRightPx = tStartIdx * dayWidth;
+                        const tWidthPx = Math.max(dayWidth, (tEndIdx - tStartIdx + 1) * dayWidth);
+                        const barColor = task.isCritical ? 'bg-rose-500 border-rose-700' : 'bg-blue-500 border-blue-700';
+
+                        rowsHtml += `
+                            <div class="flex border-b border-slate-200 hover:bg-blue-50/40 transition">
+                                <div class="w-72 min-w-[288px] sticky right-0 z-20 bg-white border-l border-slate-300 px-3 py-2 flex items-center justify-between gap-2">
+                                    <div class="truncate flex items-center gap-1.5">
+                                        <span class="text-[10px] font-mono font-bold text-slate-400">${task.wbs}</span>
+                                        <span class="text-xs font-medium text-slate-700 truncate" title="${escapeHtml(task.name)}">${escapeHtml(task.name)}</span>
+                                    </div>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${task.isCritical ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}">
+                                        ${task.duration}ي
+                                    </span>
+                                </div>
+                                <div class="relative flex-1 h-9" style="width:${timelineWidth}px; min-width:${timelineWidth}px;">
+                                    ${renderWeekendColumns(calDays, dayWidth)}
+                                    <!-- Activity Gantt Bar -->
+                                    <div style="right:${tRightPx}px; width:${tWidthPx}px;"
+                                         title="${escapeHtml(task.name)} | البداية: ${formatDateDisplay(task.startDate)} | النهاية: ${formatDateDisplay(task.finishDate)} | الإنجاز الفعلي: ${task.actualPct}%"
+                                         class="absolute top-1.5 h-6 rounded-md border ${barColor} shadow-sm overflow-hidden flex items-center">
+                                        <!-- Actual Progress Inner Fill -->
+                                        <div style="width:${task.actualPct}%" class="h-full bg-slate-900/55 transition-all duration-300"></div>
+                                        <span class="absolute right-1.5 text-[10px] font-bold text-white drop-shadow pointer-events-none whitespace-nowrap">
+                                            ${task.actualPct > 0 ? `${task.actualPct}%` : ''}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+            });
+
+            wrapper.innerHTML = `
+                <div class="inline-block min-w-full relative">
+                    <!-- Sticky Header -->
+                    <div class="flex sticky top-0 z-30 bg-slate-800 text-white border-b border-slate-700">
+                        <div class="w-72 min-w-[288px] sticky right-0 z-40 bg-slate-900 border-l border-slate-700 px-3 py-2.5 flex items-center justify-between text-xs font-bold">
+                            <span>النشاط / المرحلة (WBS)</span>
+                            <span>المدة</span>
+                        </div>
+                        <div class="flex" style="width:${timelineWidth}px; min-width:${timelineWidth}px;">
+                            ${headerCellsHtml}
+                        </div>
+                    </div>
+
+                    <!-- Body Rows -->
+                    <div class="relative">
+                        ${rowsHtml}
+                        ${dataDateOffsetPx >= 0 ? `
+                            <div style="right:${288 + dataDateOffsetPx}px;"
+                                 class="absolute top-0 bottom-0 w-0.5 bg-amber-500 z-20 pointer-events-none shadow">
+                                <span class="bg-amber-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-b absolute top-0 -translate-x-1/2 whitespace-nowrap">
+                                    تاريخ المتابعة
+                                </span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderWeekendColumns(calDays, dayWidth) {
+            let html = '<div class="absolute inset-0 flex pointer-events-none">';
+            calDays.forEach(d => {
+                const isWork = isWorkingDay(d, appState.workDaysPerWeek);
+                html += `<div style="width:${dayWidth}px; min-width:${dayWidth}px;" class="h-full border-l border-slate-100 ${!isWork ? 'bg-slate-100/80' : ''}"></div>`;
+            });
+            html += '</div>';
+            return html;
+        }
+
+        /**
+         * 10. RENDER TAB 3: CASH FLOW & S-CURVE CHARTS
+         */
+        function renderCashFlowAndCharts() {
+            const s = computedSchedule;
+            const cur = appState.currency;
+            const periodType = document.getElementById('cashflow-period').value; // 'week' or 'month'
+
+            // A. Render Phase Financial Summary Table
+            const phaseSummaryBody = document.getElementById('phase-summary-body');
+            phaseSummaryBody.innerHTML = s.phasesSummary.map(p => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color:${p.color}"></span>
+                        <span>${p.id}. ${p.name}</span>
+                    </td>
+                    <td class="p-2.5 text-center">${p.count}</td>
+                    <td class="p-2.5 text-center font-bold">${formatNumber(p.totalCost)} ${cur}</td>
+                    <td class="p-2.5 text-center text-slate-600">${p.weightPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center font-bold text-sky-700">${p.plannedPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center font-bold text-emerald-700">${p.actualPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center font-bold text-amber-700">${formatNumber(p.earnedValue)} ${cur}</td>
+                    <td class="p-2.5 text-center font-semibold text-slate-700">${p.financialPct.toFixed(1)}%</td>
+                </tr>
+            `).join('') + `
+                <tr class="bg-slate-800 text-white font-bold">
+                    <td class="p-2.5">الإجمالي الكلي للمشروع</td>
+                    <td class="p-2.5 text-center">${s.tasks.length}</td>
+                    <td class="p-2.5 text-center">${formatNumber(s.totalCost)} ${cur}</td>
+                    <td class="p-2.5 text-center">100.0%</td>
+                    <td class="p-2.5 text-center text-sky-300">${s.plannedPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center text-emerald-300">${s.actualPct.toFixed(1)}%</td>
+                    <td class="p-2.5 text-center text-amber-300">${formatNumber(s.earnedValue)} ${cur}</td>
+                    <td class="p-2.5 text-center text-amber-300">${s.financialPct.toFixed(1)}%</td>
+                </tr>
+            `;
+
+            // B. Build Time-Phased Cash Flow Buckets
+            if (!s.tasks.length || s.totalCost === 0) return;
+
+            const startCal = new Date(s.projectStartDate);
+            const endCal = new Date(s.projectEndDate);
+            const dataDate = parseDateLocal(appState.dataDate);
+
+            // Distribute each task's cost evenly across its working days
+            const dailyPlannedCost = {}; // isoDate -> cost
+            const dailyEarnedCost = {};  // isoDate -> cost (spread across elapsed days up to dataDate or finishDate)
+
+            s.tasks.forEach(t => {
+                const costPerWorkDay = t.totalCost / Math.max(1, t.duration);
+                const curDay = new Date(t.startDate);
+                while (curDay <= t.finishDate) {
+                    if (isWorkingDay(curDay, appState.workDaysPerWeek)) {
+                        const iso = formatDateISO(curDay);
+                        dailyPlannedCost[iso] = (dailyPlannedCost[iso] || 0) + costPerWorkDay;
+                    }
+                    curDay.setDate(curDay.getDate() + 1);
+                }
+
+                // Distribute Earned Value across working days from task start up to min(dataDate, finishDate)
+                if (t.earnedValue > 0) {
+                    const effectiveEnd = dataDate >= t.startDate ? (dataDate < t.finishDate ? dataDate : t.finishDate) : t.startDate;
+                    const activeDays = Math.max(1, countWorkingDaysBetween(t.startDate, effectiveEnd, appState.workDaysPerWeek));
+                    const evPerDay = t.earnedValue / activeDays;
+                    const evCur = new Date(t.startDate);
+                    let counted = 0;
+                    while (counted < activeDays) {
+                        if (isWorkingDay(evCur, appState.workDaysPerWeek)) {
+                            const iso = formatDateISO(evCur);
+                            dailyEarnedCost[iso] = (dailyEarnedCost[iso] || 0) + evPerDay;
+                            counted++;
+                        }
+                        evCur.setDate(evCur.getDate() + 1);
+                    }
+                }
+            });
+
+            // Group daily values into Weekly or Monthly periods
+            const periods = [];
+            let pCursor = new Date(startCal);
+            let periodIdx = 1;
+
+            while (pCursor <= endCal) {
+                const pStart = new Date(pCursor);
+                let pEnd = new Date(pCursor);
+                if (periodType === 'week') {
+                    pEnd.setDate(pEnd.getDate() + 6);
+                } else {
+                    pEnd = new Date(pStart.getFullYear(), pStart.getMonth() + 1, 0);
+                }
+                if (pEnd > endCal) pEnd = new Date(endCal);
+
+                let periodPV = 0;
+                let periodEV = 0;
+                const dIter = new Date(pStart);
+                while (dIter <= pEnd) {
+                    const iso = formatDateISO(dIter);
+                    periodPV += (dailyPlannedCost[iso] || 0);
+                    periodEV += (dailyEarnedCost[iso] || 0);
+                    dIter.setDate(dIter.getDate() + 1);
+                }
+
+                const label = periodType === 'week'
+                    ? `أسبوع ${periodIdx}`
+                    : pStart.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
+
+                periods.push({
+                    label,
+                    rangeText: `${formatDateDisplay(pStart)} - ${formatDateDisplay(pEnd)}`,
+                    pStart,
+                    pEnd,
+                    periodPV,
+                    periodEV
+                });
+
+                pCursor = new Date(pEnd);
+                pCursor.setDate(pCursor.getDate() + 1);
+                periodIdx++;
+            }
+
+            // Compute Cumulative Curves
+            let cumPV = 0;
+            let cumEV = 0;
+            periods.forEach(p => {
+                cumPV += p.periodPV;
+                cumEV += p.periodEV;
+                p.cumPV = cumPV;
+                p.cumPlannedPct = (cumPV / s.totalCost) * 100;
+                // Only show actual/EV curve up to periods that started on or before Data Date
+                if (p.pStart <= dataDate) {
+                    p.cumEV = cumEV;
+                    p.cumActualPct = (cumEV / s.totalCost) * 100;
+                } else {
+                    p.cumEV = null;
+                    p.cumActualPct = null;
+                }
+            });
+
+            // Render Period Cash Flow Table
+            const cfBody = document.getElementById('cashflow-table-body');
+            cfBody.innerHTML = periods.map(p => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-2.5 font-bold text-slate-800">${p.label}</td>
+                    <td class="p-2.5 text-center text-slate-500 text-[11px]">${p.rangeText}</td>
+                    <td class="p-2.5 text-center font-semibold text-blue-700">${formatNumber(p.periodPV)} ${cur}</td>
+                    <td class="p-2.5 text-center font-bold text-slate-800">${formatNumber(p.cumPV)} ${cur}</td>
+                    <td class="p-2.5 text-center font-bold text-sky-600">${Math.min(100, p.cumPlannedPct).toFixed(1)}%</td>
+                    <td class="p-2.5 text-center font-bold text-emerald-700">${p.cumEV !== null ? `${formatNumber(p.cumEV)} ${cur}` : '-'}</td>
+                    <td class="p-2.5 text-center font-bold text-amber-600">${p.cumActualPct !== null ? `${p.cumActualPct.toFixed(1)}%` : '-'}</td>
+                </tr>
+            `).join('');
+
+            // Render Chart.js Charts
+            renderCharts(periods, cur);
+        }
+
+        function renderCharts(periods, cur) {
+            const labels = periods.map(p => p.label);
+            const plannedPctData = periods.map(p => Number(Math.min(100, p.cumPlannedPct).toFixed(2)));
+            const actualPctData = periods.map(p => p.cumActualPct !== null ? Number(p.cumActualPct.toFixed(2)) : null);
+
+            const periodicPVData = periods.map(p => Math.round(p.periodPV));
+            const cumPVData = periods.map(p => Math.round(p.cumPV));
+            const cumEVData = periods.map(p => p.cumEV !== null ? Math.round(p.cumEV) : null);
+
+            // 1. S-Curve Chart
+            const ctxS = document.getElementById('scurve-chart').getContext('2d');
+            if (scurveChartInstance) scurveChartInstance.destroy();
+
+            scurveChartInstance = new Chart(ctxS, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'نسبة الإنجاز المقررة التراكمية (Planned %)',
+                            data: plannedPctData,
+                            borderColor: '#0284c7',
+                            backgroundColor: 'rgba(2, 132, 199, 0.12)',
+                            borderWidth: 3,
+                            tension: 0.35,
+                            fill: true,
+                            pointRadius: 4
+                        },
+                        {
+                            label: 'نسبة الإنجاز الفعلي والمالي (Actual & Financial %)',
+                            data: actualPctData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            borderWidth: 3,
+                            borderDash: [4, 2],
+                            tension: 0.35,
+                            fill: false,
+                            pointRadius: 5,
+                            pointBackgroundColor: '#059669'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { family: 'Cairo', weight: 'bold', size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                callback: val => val + '%',
+                                font: { family: 'Cairo' }
+                            }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Cairo', size: 11 } }
+                        }
+                    }
+                }
+            });
+
+            // 2. Cash Flow Bar + Line Chart
+            const ctxCF = document.getElementById('cashflow-chart').getContext('2d');
+            if (cashflowChartInstance) cashflowChartInstance.destroy();
+
+            cashflowChartInstance = new Chart(ctxCF, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: `التدفق النقدي الدوري (${cur})`,
+                            data: periodicPVData,
+                            backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                            borderRadius: 6,
+                            yAxisID: 'y'
+                        },
+                        {
+                            type: 'line',
+                            label: `التكلفة المخططة التراكمية PV (${cur})`,
+                            data: cumPVData,
+                            borderColor: '#4f46e5',
+                            borderWidth: 2.5,
+                            tension: 0.3,
+                            pointRadius: 3,
+                            yAxisID: 'y1'
+                        },
+                        {
+                            type: 'line',
+                            label: `القيمة المكتسبة التراكمية EV (${cur})`,
+                            data: cumEVData,
+                            borderColor: '#f59e0b',
+                            borderWidth: 3,
+                            tension: 0.3,
+                            pointRadius: 4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { font: { family: 'Cairo', weight: 'bold', size: 11 } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'التدفق الدوري', font: { family: 'Cairo', size: 10 } },
+                            ticks: { font: { family: 'Cairo', size: 10 } }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'left',
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'التراكمي', font: { family: 'Cairo', size: 10 } },
+                            ticks: { font: { family: 'Cairo', size: 10 } }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Cairo', size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        /**
+         * 11. SMART KEYWORD AUTO-CLASSIFIER & IMPORT/EXPORT
+         */
+        function classifyDescriptionToPhase(desc) {
+            const text = (desc || '').toLowerCase();
+            // Check phases in smart priority order
+            for (const phase of TECHNICAL_PHASES) {
+                for (const kw of phase.keywords) {
+                    if (text.includes(kw.toLowerCase())) {
+                        return phase.id;
+                    }
+                }
+            }
+            return 4; // Fallback default
+        }
+
+        function autoDetectPhasePreview(val) {
+            const detectedId = classifyDescriptionToPhase(val);
+            const phase = TECHNICAL_PHASES.find(p => p.id === detectedId);
+            document.getElementById('new-item-phase').value = detectedId;
+            document.getElementById('detected-phase-hint').innerHTML =
+                `<i class="fa-solid fa-robot ml-1"></i> التصنيف التلقائي المقترح: <strong>المرحلة ${phase.id}: ${phase.name}</strong>`;
+        }
+
+        function handleAddSingleItem(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-item-name').value.trim();
+            const phaseId = parseInt(document.getElementById('new-item-phase').value);
+            const qty = parseFloat(document.getElementById('new-item-qty').value) || 1;
+            const unit = document.getElementById('new-item-unit').value.trim() || "وحدة";
+            const unitPrice = parseFloat(document.getElementById('new-item-price').value) || 0;
+            const productivity = parseFloat(document.getElementById('new-item-prod').value) || 1;
+            const crews = parseInt(document.getElementById('new-item-crews').value) || 1;
+
+            appState.items.push({
+                id: Date.now() + Math.floor(Math.random() * 1000),
+                phaseId,
+                name,
+                qty,
+                unit,
+                unitPrice,
+                productivity,
+                crews,
+                actualPct: 0
+            });
+
+            closeModal('add-item-modal');
+            document.getElementById('new-item-name').value = '';
+            recalculateAll();
+            showToast("تمت إضافة البند وإعادة حساب المسار الحرج والتدفقات النقدية.", "success");
+        }
+
+        function processRawTextImport() {
+            const raw = document.getElementById('raw-boq-text').value.trim();
+            if (!raw) {
+                showToast("يرجى لصق بنود المقايسة أولاً أو استيراد ملف Excel.", "error");
+                return;
+            }
+            const replace = document.getElementById('replace-existing-boq').checked;
+            const lines = raw.split(/\r?\n/).filter(l => l.trim().length > 0);
+            const newItems = [];
+
+            lines.forEach((line, index) => {
+                // Support pipe |, tab \t, or comma , delimiters
+                const parts = line.includes('|') ? line.split('|') : (line.includes('\t') ? line.split('\t') : line.split(','));
+                const name = (parts[0] || '').trim();
+                if (!name) return;
+
+                const qty = parseFloat((parts[1] || '1').trim()) || 1;
+                const unit = (parts[2] || 'مقطوعية').trim();
+                const unitPrice = parseFloat((parts[3] || '100').trim()) || 0;
+                const productivity = parseFloat((parts[4] || '10').trim()) || 10;
+                const phaseId = classifyDescriptionToPhase(name);
+
+                newItems.push({
+                    id: Date.now() + index,
+                    phaseId,
+                    name,
+                    qty,
+                    unit,
+                    unitPrice,
+                    productivity,
+                    crews: 1,
+                    actualPct: 0
+                });
+            });
+
+            if (newItems.length === 0) {
+                showToast("لم يتم التعرف على بنود صالحة.", "error");
+                return;
+            }
+
+            if (replace) {
+                appState.items = newItems;
+            } else {
+                appState.items = appState.items.concat(newItems);
+            }
+
+            closeModal('import-modal');
+            recalculateAll();
+            showToast(`تم استيراد وتصنيف ${newItems.length} بنداً تلقائياً وفق التسلسل الفني الإلزامي!`, "success");
+        }
+
+        function handleExcelUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+                    const replace = document.getElementById('replace-existing-boq').checked;
+                    const importedItems = [];
+
+                    rows.forEach((row, idx) => {
+                        if (!row || row.length === 0) return;
+                        const firstCell = String(row[0] || '').trim();
+                        // Skip header row
+                        if (idx === 0 && (firstCell.includes('وصف') || firstCell.toLowerCase().includes('desc') || firstCell.includes('البند'))) return;
+                        if (!firstCell) return;
+
+                        const qty = parseFloat(row[1]) || 1;
+                        const unit = String(row[2] || 'مقطوعية').trim();
+                        const unitPrice = parseFloat(row[3]) || 0;
+                        const productivity = parseFloat(row[4]) || 10;
+                        const explicitPhase = parseInt(row[5]);
+                        const phaseId = (explicitPhase >= 1 && explicitPhase <= 9) ? explicitPhase : classifyDescriptionToPhase(firstCell);
+
+                        importedItems.push({
+                            id: Date.now() + idx,
+                            phaseId,
+                            name: firstCell,
+                            qty,
+                            unit,
+                            unitPrice,
+                            productivity,
+                            crews: 1,
+                            actualPct: 0
+                        });
+                    });
+
+                    if (importedItems.length > 0) {
+                        appState.items = replace ? importedItems : appState.items.concat(importedItems);
+                        closeModal('import-modal');
+                        recalculateAll();
+                        showToast(`تم استيراد وتصنيف ${importedItems.length} بنداً من ملف Excel بنجاح!`, "success");
+                    } else {
+                        showToast("الملف فارغ أو لا يحتوي على بيانات صالحة.", "error");
+                    }
+                } catch (err) {
+                    console.error(err);
+                    showToast("حدث خطأ أثناء قراءة ملف Excel.", "error");
+                }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function downloadSampleTemplate() {
+            const wsData = [
+                ["وصف البند (Description)", "الكمية (Qty)", "الوحدة (Unit)", "سعر الوحدة (Unit Price)", "الإنتاجية اليومية (Productivity)", "رقم المرحلة الاختياري (1-9)"],
+                ["تكسير وإزالة البلاط القديم وترحيل المخلفات", 200, "م2", 35, 50, 1],
+                ["تأسيس مواسير تغذية المياه PPR والصرف الصحي", 100, "م.ط", 85, 25, 2],
+                ["مد خراطيم الكهرباء وسحب الأسلاك وتركيب العلب", 150, "نقطة", 95, 30, 3],
+                ["تركيب سيراميك أرضيات بورسلين مع الترويب", 200, "م2", 140, 25, 4],
+                ["تركيب حلوق الأبواب الخشبية وشبابيك الألمنيوم", 12, "عدد", 900, 3, 5],
+                ["أعمال معجون وصنفرة ودهان بلاستيك وجهين", 500, "م2", 45, 50, 6],
+                ["تركيب ضلف الأبواب الخشبية والأقفال وزجاج الشبابيك", 12, "عدد", 1100, 4, 7],
+                ["تركيب كشافات الإنارة الليد ووحدات التكييف السبليت", 15, "وحدة", 2200, 3, 8],
+                ["توريد وتركيب دواليب المطبخ والأثاث والستائر", 1, "مقطوعية", 40000, 0.25, 9]
+            ];
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, "نموذج_المقايسة");
+            XLSX.writeFile(wb, "نموذج_استيراد_جدول_الكميات.xlsx");
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+
+            // Sheet 1: Full Schedule & BOQ
+            const scheduleRows = [
+                ["WBS", "المرحلة الفنية", "وصف البند", "الكمية", "الوحدة", "سعر الوحدة", "الإجمالي", "الإنتاجية/يوم", "الفرق", "المدة (يوم)", "تاريخ البداية", "تاريخ النهاية", "المسار الحرج", "الإنجاز المخطط %", "الإنجاز الفعلي %", "القيمة المكتسبة (EV)"]
+            ];
+            computedSchedule.tasks.forEach(t => {
+                scheduleRows.push([
+                    t.wbs,
+                    `${t.phaseId}. ${t.phaseName}`,
+                    t.name,
+                    t.qty,
+                    t.unit,
+                    t.unitPrice,
+                    t.totalCost,
+                    t.productivity,
+                    t.crews,
+                    t.duration,
+                    formatDateDisplay(t.startDate),
+                    formatDateDisplay(t.finishDate),
+                    t.isCritical ? "حرج (Critical)" : `سماحية ${t.totalFloat} يوم`,
+                    Number(t.plannedPct.toFixed(1)),
+                    Number(t.actualPct),
+                    Number(t.earnedValue.toFixed(2))
+                ]);
+            });
+            const wsSchedule = XLSX.utils.aoa_to_sheet(scheduleRows);
+            XLSX.utils.book_append_sheet(wb, wsSchedule, "البرنامج_الزمني_والمقايسة");
+
+            // Sheet 2: Phase Financial Summary
+            const phaseRows = [
+                ["المرحلة", "اسم المرحلة الفنية", "عدد البنود", "التكلفة المخططة", "الوزن النسبي %", "الإنجاز المقرر %", "الإنجاز الفعلي %", "القيمة المكتسبة", "الإنجاز المالي %"]
+            ];
+            computedSchedule.phasesSummary.forEach(p => {
+                phaseRows.push([
+                    p.id, p.name, p.count, p.totalCost,
+                    Number(p.weightPct.toFixed(2)),
+                    Number(p.plannedPct.toFixed(2)),
+                    Number(p.actualPct.toFixed(2)),
+                    Number(p.earnedValue.toFixed(2)),
+                    Number(p.financialPct.toFixed(2))
+                ]);
+            });
+            const wsPhases = XLSX.utils.aoa_to_sheet(phaseRows);
+            XLSX.utils.book_append_sheet(wb, wsPhases, "ملخص_المراحل_والتدفقات");
+
+            XLSX.writeFile(wb, `البرنامج_الزمني_${appState.projectName.replace(/\s+/g, '_')}.xlsx`);
+            showToast("تم تصدير البرنامج الزمني والتدفقات المالية إلى Excel بنجاح.", "success");
+        }
+
+        /**
+         * 12. UI HELPERS (TABS, MODALS, TOASTS, FORMATTING)
+         */
+        function switchTab(tabName) {
+            ['boq', 'gantt', 'cashflow'].forEach(t => {
+                const content = document.getElementById(`tab-content-${t}`);
+                const btn = document.getElementById(`tab-btn-${t}`);
+                if (t === tabName) {
+                    content.classList.remove('hidden');
+                    btn.className = "tab-btn px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 border-blue-600 bg-white text-blue-700 flex items-center gap-2 transition";
+                } else {
+                    content.classList.add('hidden');
+                    btn.className = "tab-btn px-4 py-2.5 text-sm font-bold rounded-t-xl border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center gap-2 transition";
+                }
+            });
+
+            if (tabName === 'cashflow') {
+                renderCashFlowAndCharts();
+            } else if (tabName === 'gantt') {
+                renderGanttChart();
+            }
+        }
+
+        function openModal(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('hidden');
+            el.classList.add('flex');
+        }
+
+        function closeModal(id) {
+            const el = document.getElementById(id);
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const colors = {
+                success: 'bg-emerald-700 text-white border-emerald-500',
+                error: 'bg-rose-700 text-white border-rose-500',
+                info: 'bg-slate-800 text-white border-slate-600'
+            };
+            toast.className = `px-4 py-3 rounded-xl shadow-lg border text-xs font-bold flex items-center gap-2 pointer-events-auto transition-all duration-300 ${colors[type] || colors.info}`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info'}"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function formatNumber(num) {
+            return Math.round(num || 0).toLocaleString('en-US');
+        }
+
+        function escapeHtml(str) {
+            return String(str || '')
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+        }
+    </script>
+</body>
+</html>
